@@ -1,3 +1,6 @@
+import lombok.Data;
+
+@Data
 public class CsvRow {
     private int first;
     private int second;

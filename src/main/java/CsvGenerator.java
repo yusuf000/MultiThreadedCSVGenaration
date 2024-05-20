@@ -10,37 +10,48 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 public class CsvGenerator{
 
     File csvFile;
     List<CsvRow> csvRows = new ArrayList<>();
-    Executor executor = Executors.newFixedThreadPool(20);
+    ExecutorService executor = Executors.newFixedThreadPool(20);
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    CountDownLatch countDownLatch;
 
 
-    public CsvGenerator(String filePath) throws IOException, CsvRequiredFieldEmptyException, CsvDataTypeMismatchException {
-        boolean allThreadDone = false;
-        List<CsvGenerate> generators = new ArrayList<>();
-        for (int i = 0; i < 200; i++) {
-            CsvGenerate csvGenerate = new CsvGenerate(i);
-            executor.execute(csvGenerate);
-        }
+    public CsvGenerator(String filePath) {
+        countDownLatch = new CountDownLatch(10);
+        csvFile = new File(filePath);
+    }
 
-        File file = new File(filePath);
-        FileWriter outputfile = new FileWriter(file);
-        CSVWriter fileWriter = new CSVWriter(outputfile);
-        StatefulBeanToCsv<CsvRow> writer = new StatefulBeanToCsvBuilder<CsvRow>(fileWriter)
-                .withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
-                .withSeparator(CSVWriter.DEFAULT_SEPARATOR)
-                .withOrderedResults(false)
-                .build();
+    public Future<File> generateCsv()  throws IOException, CsvRequiredFieldEmptyException, CsvDataTypeMismatchException, InterruptedException{
+        return executorService.submit(() -> {
+            List<CsvGenerate> generators = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                CsvGenerate csvGenerate = new CsvGenerate(i);
+                executor.execute(csvGenerate);
+            }
+            countDownLatch.await();
+            executor.shutdown();
+            FileWriter outputfile = new FileWriter(csvFile);
+            CSVWriter fileWriter = new CSVWriter(outputfile);
+            StatefulBeanToCsv<CsvRow> writer = new StatefulBeanToCsvBuilder<CsvRow>(fileWriter)
+                    .withQuotechar(CSVWriter.NO_QUOTE_CHARACTER)
+                    .withSeparator(CSVWriter.DEFAULT_SEPARATOR)
+                    .withOrderedResults(false)
+                    .build();
 
-        //write all data to csv file
-        writer.write(csvRows);
-        fileWriter.close();
+            //write all data to csv file
+            writer.write(csvRows);
+            fileWriter.close();
+            return csvFile;
+        });
+    }
+
+    public void shutDown() {
+        executorService.shutdown();
     }
 
     class CsvGenerate implements Runnable  {
@@ -54,13 +65,16 @@ public class CsvGenerator{
         @Override
         public void run() {
             List<CsvRow> rows = new ArrayList<>();
-            for (int i = 0; i < 1000; i++) {
+            System.out.println("Thread " + threadNumber);
+            for (int i = 0; i < 10; i++) {
                 rows.add(new CsvRow(this.threadNumber, random.nextInt(), random.nextInt()));
             }
             addToList(rows);
         }
         synchronized void addToList(List<CsvRow> rows) {
             csvRows.addAll(rows);
+            System.out.println("Thread completed " + threadNumber);
+            countDownLatch.countDown();
         }
     }
 
