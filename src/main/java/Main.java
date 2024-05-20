@@ -50,10 +50,6 @@ public class Main {
     }
 
     public static void makeZip(List<File> files) throws IOException {
-        String file1 = "src/main/resources/zipTest/test1.txt";
-        String file2 = "src/main/resources/zipTest/test2.txt";
-        final List<String> srcFiles = Arrays.asList(file1, file2);
-
         final FileOutputStream fos = new FileOutputStream("compressed.zip");
         ZipOutputStream zipOut = new ZipOutputStream(fos);
 
